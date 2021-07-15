@@ -1,0 +1,127 @@
+/********************************************************************/ 
+/*        Christian Soto Atiles
+ *        Biomedical Engineer - PUPR
+ *        csoto@diss.io
+ * 
+ *        Remote Health Monitoring System 0.1v - Main Module Standalone
+ *  
+ *        This code is design to work under the current Remote Health Monitoring System
+ *        prototype main module and pin schematics of the main module only. 
+ *        It will fundamentally read the following physiological signals from the human body.
+ *  
+ *        1. Electrocardiogram data
+ *        2. Electromyogram
+ *        3. Body Temperature
+ *    
+ *  
+ */
+
+/********************************************************************/ 
+// The library used for the body temperature sensor or LM131 has a delay
+//of aprox 200ms per data output. On the other hand, ECG samples every 1ms.
+//To avoid loosing ECG and EMG data, the code counts the sample output, and
+// calls the temperature verification function every 200 samples or aprox
+// every 200ms. 
+/********************************************************************/ 
+
+
+//-------Begin BodyTemperature Sensor-------
+//BodyTemperature Sensor Libraries
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+// Digital Pin set to Temperature Sensor
+#define ONE_WIRE_BUS 5
+ 
+// Setup a oneWire instance to communicate with any OneWire devices 
+// (not just Maxim/Dallas temperature ICs)
+OneWire oneWire(ONE_WIRE_BUS);
+ 
+// Pass our oneWire reference to Dallas Temperature.
+DallasTemperature sensors(&oneWire);
+//-------End BodyTemperature Sensor-------
+
+
+//-------Begin Electromyogram-------
+//Analog pin A0 set to Data on the ECG Module
+int EMGData = 1;
+//-------End Electromyogram-------
+
+
+
+//-------Begin Electrocardiogram-------
+//Analog pin A1 set to Data on the EMG Module
+int ECGData = 0;
+//-------End Electrocardiogram-------
+
+
+// Sample counter and temporary temperature 
+int rCounter = 0;
+long temp = 0.00;
+
+
+
+void setup(void) 
+{ 
+ // start serial port 
+ Serial.begin(9600); 
+
+  pinMode(10, INPUT); // Setup for leads off detection LO +
+  pinMode(11, INPUT); // Setup for leads off detection LO -
+
+ Serial.println("Dallas Temperature IC Control Library init"); 
+ // Start up the library 
+ sensors.begin(); 
+ 
+} 
+
+
+void loop(void) 
+{ 
+
+  //Verify how much data has been output through Tx.
+  //If ~200ms have gone by or 300 samples output, then verify 
+  //for update in the temperature sensor
+  
+  if(rCounter == 300) 
+  {
+  //verify the current value on sensor
+  sensors.requestTemperatures(); // Send the command to get temperature readings 
+   //store the current temperature value
+  temp = sensors.getTempCByIndex(0);
+
+
+  //re initialize sample counter
+  rCounter = 0;
+    
+  }
+   
+//********************************************************************/
+
+//Verify value on LO+ and LO -
+// Value of 1 means on digital pin readout is equivalent to null
+ if((digitalRead(10) == 1)||(digitalRead(11) == 1)){
+   Serial.println('!');
+ }
+ 
+  else{
+    //If the digital pin readout is not null
+   // Send the value of analog input 0:
+    Serial.print(analogRead(A0));
+    Serial.print(",");
+
+   //Read electormyocardiogram value at pin analog A1
+ int sensorValue = analogRead(A1);
+
+// print out the value you read:
+ Serial.print(sensorValue);
+ Serial.print(",");
+
+  //finally, print the current temperature sensor value
+ Serial.println(temp);
+ 
+ //record sample 
+    rCounter +=1;
+  }
+}
+
