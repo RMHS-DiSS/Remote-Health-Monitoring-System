@@ -1,0 +1,211 @@
+/*        Christian Soto Atiles
+ *        Biomedical Engineer - PUPR
+ *        csoto@diss.io
+ * 
+ *        Remote Health Monitoring System 0.1v
+ *  
+ *        This code is design to work under the current Remote Health Monitoring System
+ *        prototype and pin schematics. It will fundamentally read the following
+ *        physiological signals from the human body.
+ *  
+ *        1. Electroencephalogram
+ *        2. Electrocardiogram data
+ *        3. Electromyogram
+ *        4. Body Temperature
+ *        5. Heart Pulse
+ *        6. Sp02 Saturation - Calculated using red, infrared, and green wavelength
+ *  
+ *  
+ */
+
+//-------Begin BodyTemperature Sensor-------
+//BodyTemperature Sensor Libraries
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+// Digital Pin set to Temperature Sensor
+#define ONE_WIRE_BUS 5
+ 
+// Setup a oneWire instance to communicate with any OneWire devices 
+// (not just Maxim/Dallas temperature ICs)
+OneWire oneWire(ONE_WIRE_BUS);
+ 
+// Pass our oneWire reference to Dallas Temperature.
+DallasTemperature sensors(&oneWire);
+//-------End BodyTemperature Sensor-------
+
+
+
+//-------Begin Pulse Sensor Wrist-------
+//Analog pin A3 set to Data on Pulse Sensor
+int PulseSensorData = 3;
+//-------End Pulse Sensor Wrist-------
+
+
+
+//-------Begin Electromyogram-------
+//Analog pin A0 set to Data on the ECG Module
+int EMGData = 1;
+//-------End Electromyogram-------
+
+
+
+//-------Begin Electrocardiogram-------
+//Analog pin A1 set to Data on the EMG Module
+int ECGData = 0;
+//-------End Electrocardiogram-------
+
+
+
+
+//-------Begin Electroencephalogram-------
+#include <Brain.h>
+Brain brain(Serial);
+//-------End Electroencephalogram-------
+
+
+//-------Begin Oximeter (SpO2)-------
+#include <Wire.h>
+#include "MAX30105.h"
+MAX30105 particleSensor;
+//-------End Oximeter (SpO2)-------
+
+
+
+//Main Variables Declaration
+String dataOutput = "";
+
+
+
+//Object construction and initializations
+void setup(void)
+{
+
+  
+  // start serial port
+  Serial.begin(9600);
+
+  pinMode(10, INPUT); // Setup for leads off detection LO +
+  pinMode(11, INPUT); // Setup for leads off detection LO -
+
+  //Initialize Oximeter Sensor
+ 
+ 
+  // Start up the One-Wire Library (Temp Sensor)
+  Serial.println("Setup and Initializing Temp Sensor");
+  sensors.begin();
+  Serial.println("Sucess!");
+
+
+  Serial.println("Initializing Particle Sensor - SpO2 & Pulse");
+  while (particleSensor.begin() == false)
+  {
+    Serial.println("MAX30105 was not found. Please check wiring/power. ");
+  
+  }
+  Serial.println("Sucess - SpO2 & Pulse");
+
+
+  Serial.println("Final Particle Sensor Setup - SpO2 & Pulse");
+  particleSensor.setup(); //Configure sensor. Use 6.4mA for LED drive
+  Serial.println("System initialized!");
+}
+
+
+
+void loop(void)
+{
+ 
+  sensors.requestTemperatures(); // Send the command to get temperatures
+
+   //1. Print Electroencephalogram Data
+   //EEG Chipset only has half duplex Tx Channel, therefor to synchronize all data, this will be the delimeter. 
+   //Expect packets about once per second.
+   //When EEG .readCSV() functions returns true, record all the other physiological data in the same string
+  
+  if (brain.update()) {
+
+    
+    //Empty the string to prepare for new data points
+    dataOutput = "";
+
+  
+        //Serial.print(brain.readErrors());
+       // Serial.print(brain.readCSV());
+       // Serial.print(" , ");
+
+       //Stores: signal strength, attention, meditation, delta, theta, low alpha, high alpha, low beta, high beta, low gamma, high gamma
+        dataOutput += brain.readCSV();
+        dataOutput += " , ";
+
+
+       //2. Record EMG data
+
+        //Serial.print(analogRead(EMGData));
+        // Serial.print(" , ");
+        dataOutput += analogRead(EMGData);
+        dataOutput += " , ";
+
+
+      //3. Record ECG Data
+      //Lo+ and Lo- configured to digital pin 10 and 11
+      //At moment of recording, first verify for signal activity
+      if((digitalRead(10) == 1)||(digitalRead(11) == 1))
+       {
+       //Serial.print('!');
+       //Serial.print(" , ");
+        //IF signal at pin 10 or 11 where null at moment of reading, record a marking error
+        //otherwise, the value of the third lead connected to analog pin 0 will be recorded 
+        dataOutput += '!';
+        dataOutput += " , ";
+        
+       }
+       else
+      {
+
+        
+      // send the value of analog input 0:
+      // Serial.print(analogRead(ECGData));
+      // Serial.print(" , ");
+      dataOutput += analogRead(ECGData);
+      dataOutput += " , ";
+      }
+  
+    //4. Print Temp Sensor Data
+
+    // Serial.print(sensors.getTempCByIndex(0));
+   //Serial.print(" , ");
+
+    dataOutput += sensors.getTempCByIndex(0);
+    dataOutput += " , ";
+
+   //5. Print the Wrist pulse sensor Data
+   //Serial.print(analogRead(PulseSensorData));
+   //Serial.print(" , ");
+
+   dataOutput += analogRead(PulseSensorData);
+   dataOutput += " , ";
+
+
+   //6. Finally, print Oximeter Data
+
+  // Serial.print(particleSensor.getRed());
+  // Serial.print(" , ");
+
+   dataOutput += particleSensor.getRed();
+   dataOutput += " , ";
+
+   // Serial.print(particleSensor.getIR());
+   // Serial.print(" , ");
+
+   dataOutput += particleSensor.getIR();
+   dataOutput += " , ";
+
+   // Serial.println(particleSensor.getGreen());
+
+    dataOutput += particleSensor.getGreen();
+   
+    Serial.println(dataOutput);
+    }
+  
+}
